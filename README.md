@@ -1,3 +1,4 @@
-# SmoothKml
+Smooth KML
+(c) 2018 Joost Haverkort
 
-Utility for removing unneeded data from a kml file for VFRadar to use
+Utility for smoothing out polygon data in a KML file, to make it faster to read for VFRadar.
