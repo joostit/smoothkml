@@ -28,19 +28,21 @@ namespace SmoothKml
             XmlDocument doc = new XmlDocument();
             doc.Load(kmlFile);
 
-            removeUnneededDataNodes(doc);
             removeSmallAreas(doc);
             smoothOutPolygons(doc);
+            addNameElementAreas(doc);
+            removeSchemaData(doc);
+            removeExtendedData(doc);
 
             Console.WriteLine("Saving " + outputFile + "...");
 
             doc.Save(outputFile);
 
-            
+
 
             FileInfo endFileInfo = new FileInfo(outputFile);
 
-            double sizeLeft = ((double) endFileInfo.Length / (double) startFileInfo.Length) * 100.0;
+            double sizeLeft = ((double)endFileInfo.Length / (double)startFileInfo.Length) * 100.0;
 
             String origSizeKb = String.Format(CultureInfo.InvariantCulture, "{0:0,000.###} kb", (startFileInfo.Length / 1024.0));
             String endSizeKb = String.Format(CultureInfo.InvariantCulture, "{0:0,000.###} kb", (endFileInfo.Length / 1024.0));
@@ -78,10 +80,10 @@ namespace SmoothKml
                         if (attValue == "population")
                         {
                             int population = Convert.ToInt32(dataElement.InnerText);
-                            if(population < minimumPopulation)
+                            if (population < minimumPopulation)
                             {
                                 toRemove.Add(schemaDataNode);
-                                break; 
+                                break;
                             }
                         }
                     }
@@ -97,6 +99,43 @@ namespace SmoothKml
             Console.WriteLine("Removed " + toRemove.Count + " small placemarks.");
 
         }
+
+
+        private static void addNameElementAreas(XmlDocument doc)
+        {
+            XmlNodeList placemarkNodes = doc.GetElementsByTagName("Placemark");
+
+            Console.WriteLine("Iterating " + placemarkNodes.Count + " placemark nodes to add the name element " + minimumPopulation);
+
+            foreach (XmlElement placemarkNode in placemarkNodes)
+            {
+
+                XmlNodeList dataElements = placemarkNode.GetElementsByTagName("SimpleData");
+                foreach (XmlElement dataElement in dataElements)
+                {
+                    XmlAttribute att = dataElement.Attributes["name"];
+                    if (att != null)
+                    {
+
+                        String attValue = att.Value;
+                        if (attValue == "name")
+                        {
+                            String polygnName = dataElement.InnerText;
+                            XmlElement nameElement = doc.CreateElement("name", "http://www.opengis.net/kml/2.2");
+                            nameElement.InnerText = polygnName;
+                            placemarkNode.InsertAfter(nameElement, null);
+                            break;
+                        }
+                    }
+                }
+
+            }
+
+
+            Console.WriteLine("Replaced all extendedData name attributes with name elements.");
+
+        }
+
 
         private static void smoothOutPolygons(XmlDocument doc)
         {
@@ -124,7 +163,7 @@ namespace SmoothKml
                 index++;
             }
 
-            double distanceCoordinatesLeft = distanceSizeLeftSum / (double) total;
+            double distanceCoordinatesLeft = distanceSizeLeftSum / (double)total;
             double bearingCoordinatesLeft = bearingSizeLeftSum / (double)total;
 
 
@@ -135,53 +174,52 @@ namespace SmoothKml
 
 
 
-        private static void removeUnneededDataNodes(XmlDocument doc)
+        private static void removeExtendedData(XmlDocument doc)
         {
+
+            Console.WriteLine("Removing all extendedData nodes");
+
             List<XmlNode> toRemove = new List<XmlNode>();
 
-            XmlNodeList schemaDataNodes = doc.GetElementsByTagName("SchemaData");
+            XmlNodeList placemarks = doc.GetElementsByTagName("Placemark");
 
-            foreach (XmlNode schemaDataNode in schemaDataNodes)
+            foreach (XmlElement placemark in placemarks)
             {
-                bool nameFound = false;
-                XmlNodeList simpleDataNodes = schemaDataNode.ChildNodes;
-
-                foreach (XmlNode simpleDataNode in simpleDataNodes)
+                XmlNodeList extendedDataNodes = placemark.GetElementsByTagName("ExtendedData");
+                foreach (XmlNode extendedDataNode in extendedDataNodes)
                 {
-                    XmlAttribute att = simpleDataNode.Attributes["name"];
-                    if (att != null)
-                    {
-                        String attValue = att.Value;
-
-                        if (attValue == "name")
-                        {
-                            if (nameFound)
-                            {
-                                toRemove.Add(simpleDataNode);
-                            }
-                            else
-                            {
-                                nameFound = true;
-                            }
-                        }
-                        else if (attValue == "population")
-                        {
-
-                        }
-                        else
-                        {
-                            toRemove.Add(simpleDataNode);
-                        }
-                    }
+                    toRemove.Add(extendedDataNode);
                 }
             }
 
-            Console.WriteLine("Found " + toRemove.Count + " unneeded SimpleData elements. Removing...");
 
             foreach (var node in toRemove)
             {
                 node.ParentNode.RemoveChild(node);
             }
+
+        }
+
+        private static void removeSchemaData(XmlDocument doc)
+        {
+
+            Console.WriteLine("Removing schema data");
+
+            List<XmlNode> toRemove = new List<XmlNode>();
+
+            XmlNodeList schemaNodes = doc.GetElementsByTagName("Schema");
+
+            foreach (XmlElement schemaNode in schemaNodes)
+            {
+                toRemove.Add(schemaNode);
+            }
+
+
+            foreach (var node in toRemove)
+            {
+                node.ParentNode.RemoveChild(node);
+            }
+
         }
     }
 }
